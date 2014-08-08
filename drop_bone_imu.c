@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <string.h>
 
+static int fd; // file descriptor for the I2C bus
+
 int main(int argc, char **argv){
     printf("Open bus: %i\n", open_bus());
     unsigned char whoami=0;
