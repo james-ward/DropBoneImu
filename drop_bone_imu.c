@@ -4,19 +4,26 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
+#include <unistd.h>
+#include <string.h>
+
 
 int main(int argc, char **argv){
-    open_bus();
+    printf("Open bus: %i\n", open_bus());
     return 0;
 }
 
 int i2c_write(unsigned char slave_addr, unsigned char reg_addr,
     unsigned char length, unsigned char const *data){
-        
+    unsigned char buf[length+1];
+    buf[0] = slave_addr;
+    memcpy(buf+1, data, length);
+    return write(fd, buf, length+1) != length+1;
 }
 int i2c_read(unsigned char slave_addr, unsigned char reg_addr,
     unsigned char length, unsigned char *data){
-        
+    write(fd, &reg_addr, 1);
+    return read(fd, data, length) != length; 
 }
 
 int open_bus() { 
