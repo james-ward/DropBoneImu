@@ -29,7 +29,8 @@ int open_bus() {
         perror("Failed to acquire bus access and/or talk to slave.\n");
         /* ERROR HANDLING; you can check errno to see what went wrong */
         return 1;
-    }	
+    }
+    return 0;
 }
 
 void delay_ms(unsigned long num_ms){
