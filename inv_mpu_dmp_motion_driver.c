@@ -24,6 +24,8 @@
 #include "dmpKey.h"
 #include "dmpmap.h"
 
+#include "drop_bone_imu.h"
+
 /* The following functions must be defined for this platform:
  * i2c_write(unsigned char slave_addr, unsigned char reg_addr,
  *      unsigned char length, unsigned char const *data)
