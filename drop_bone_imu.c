@@ -10,6 +10,11 @@
 static int fd; // file descriptor for the I2C bus
 
 int main(int argc, char **argv){
+    init();
+    return 0;
+}
+
+int init(void) {
     printf("Open bus: %i\n", open_bus());
     unsigned char whoami=0;
     i2c_read(MPU6050_ADDR, MPU6050_WHO_AM_I, 1, &whoami);

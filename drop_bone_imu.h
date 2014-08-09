@@ -30,6 +30,7 @@
 #define log_i printf
 
 int main(int argc, char **argv);
+int init(void);
 
 int i2c_write(unsigned char slave_addr, unsigned char reg_addr,
     unsigned char length, unsigned char const *data);
