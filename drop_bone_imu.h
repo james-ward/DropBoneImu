@@ -9,6 +9,8 @@
 #define MPU6050_WHO_AM_I 0x75
 #define DEFAULT_MPU_HZ  100
 #define DEFAULT_FIFO_HZ 10
+#define QUAT_SCALE 1073741824.0
+
 
 #include "inv_mpu_dmp_motion_driver.h"
 #include "inv_mpu.h"
@@ -32,6 +34,7 @@
 
 int main(int argc, char **argv);
 int init(void);
+void euler(long* quat, float* euler_angles); // Convert quaternions to Euler angles
 
 int i2c_write(unsigned char slave_addr, unsigned char reg_addr,
     unsigned char length, unsigned char const *data);

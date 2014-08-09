@@ -6,6 +6,7 @@
 #include <linux/i2c-dev.h>
 #include <unistd.h>
 #include <string.h>
+#include <math.h>
 
 static int fd; // file descriptor for the I2C bus
 
@@ -17,11 +18,25 @@ int main(int argc, char **argv){
     long quat[4];
     unsigned long timestamp;
     unsigned char more[0];
+    
     for (;;) {
+        short status;
+        mpu_get_int_status(&status);
+        if (! (status & MPU_INT_STATUS_DMP) )
+            continue;
         int fifo_read = dmp_read_fifo(gyro, accel, quat, &timestamp, sensors, more);
-        if (sensors[0]) {
-            printf("Quaternions: %i\t%i\t%i\t%i\n", quat[0], quat[1], quat[2], quat[3]);
+        if (fifo_read != 0) {
+            printf("Error reading fifo.\n");
         }
+        if (fifo_read == 0 && sensors[0]) {
+            float angles[3];
+            euler(quat, angles);
+            //printf("Quaternions: %f\t%f\t%f\t%f\n",
+            //    quat[0] / QUAT_SCALE, quat[1] / QUAT_SCALE, quat[2] / QUAT_SCALE, quat[3] / QUAT_SCALE);
+            printf("Yaw: %+5.1f\tRoll: %+5.1f\tPitch: %+5.1f\n",
+                angles[0]*180.0/3.14159, angles[1]*180.0/3.14159, angles[2]*180.0/3.14159);
+        }
+        usleep(20000);
     }
     return 0;
 }
@@ -43,24 +58,24 @@ int init(void) {
     mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL);
     /* Push both gyro and accel data into the FIFO. */
     mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL);
-    mpu_set_sample_rate(DEFAULT_MPU_HZ);
+    //mpu_set_sample_rate(DEFAULT_MPU_HZ);
 
     
     /* Now do the DMP stuff. */
     printf("DMP firmware load: %i\n", dmp_load_motion_driver_firmware());
     dmp_set_fifo_rate(DEFAULT_FIFO_HZ);
-    /*dmp_enable_gyro_cal(1); // Will reset biases after 8 sec of no motion
-    dmp_enable_lp_quat(1); // Generate quaternions
-    * */
+    
     unsigned short dmp_features = DMP_FEATURE_LP_QUAT | DMP_FEATURE_TAP |
-        DMP_FEATURE_SEND_RAW_GYRO | DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO |
+        DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO |
         DMP_FEATURE_GYRO_CAL;
     dmp_enable_feature(dmp_features);
-    //dmp_set_interrupt_mode(DMP_INT_CONTINUOUS); // Fire interrupt on new FIFO value
+    
+    mpu_set_int_level(0); // Interrupt is high when firing
+    //mpu_set_int_latched(1);
+    dmp_set_interrupt_mode(DMP_INT_CONTINUOUS); // Fire interrupt on new FIFO value
     mpu_set_dmp_state(1); // Turn on DMP
     mpu_get_dmp_state(&dmp_state);
     printf("DMP state: %i\n", dmp_state);
-    //set_int_enable(1); // Enable interrupt
     return 0;
 }
 
@@ -108,4 +123,13 @@ inline void __no_operation(){
     
 }
 
-
+void euler(long* quat, float* euler_angles) {
+    float q[4];
+    unsigned char i=0;
+    for (i=0; i<4; ++i) {
+        q[i] = (float)quat[i] / QUAT_SCALE;
+    }
+    euler_angles[0] = atan2(2*q[1]*q[2] - 2*q[0]*q[3], 2*q[0]*q[0] + 2*q[1]*q[1] - 1); // psi, yaw
+    euler_angles[1] = -asin(2*q[1]*q[3] + 2*q[0]*q[2]); // theta, roll
+    euler_angles[2] = atan2(2*q[2]*q[3] - 2*q[0]*q[1], 2*q[0]*q[0] + 2*q[3]*q[3] - 1); // phi, pitch
+}
