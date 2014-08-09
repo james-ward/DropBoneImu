@@ -11,16 +11,31 @@ static int fd; // file descriptor for the I2C bus
 
 int main(int argc, char **argv){
     init();
+
+    // Loop and read from FIFO
+    short accel[3], gyro[3], sensors[1];
+    long quat[4];
+    unsigned long timestamp;
+    unsigned char more[0];
+    for (;;) {
+        int fifo_read = dmp_read_fifo(gyro, accel, quat, &timestamp, sensors, more);
+        if (sensors[0]) {
+            printf("Quaternions: %i\t%i\t%i\t%i\n", quat[0], quat[1], quat[2], quat[3]);
+        }
+    }
     return 0;
 }
 
 int init(void) {
-    printf("Open bus: %i\n", open_bus());
+    struct int_param_s int_param;
+    
     unsigned char whoami=0;
+    unsigned char dmp_state = 0;
+    
+    printf("Open bus: %i\n", open_bus());
     i2c_read(MPU6050_ADDR, MPU6050_WHO_AM_I, 1, &whoami);
     printf("WHO_AM_I: %x\n", whoami);
 
-    struct int_param_s int_param;
     printf("MPU init: %i\n", mpu_init(&int_param));
 
     /* Get/set hardware configuration. Start gyro. */
@@ -30,9 +45,22 @@ int init(void) {
     mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL);
     mpu_set_sample_rate(DEFAULT_MPU_HZ);
 
+    
     /* Now do the DMP stuff. */
     printf("DMP firmware load: %i\n", dmp_load_motion_driver_firmware());
-
+    dmp_set_fifo_rate(DEFAULT_FIFO_HZ);
+    /*dmp_enable_gyro_cal(1); // Will reset biases after 8 sec of no motion
+    dmp_enable_lp_quat(1); // Generate quaternions
+    * */
+    unsigned short dmp_features = DMP_FEATURE_LP_QUAT | DMP_FEATURE_TAP |
+        DMP_FEATURE_SEND_RAW_GYRO | DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO |
+        DMP_FEATURE_GYRO_CAL;
+    dmp_enable_feature(dmp_features);
+    //dmp_set_interrupt_mode(DMP_INT_CONTINUOUS); // Fire interrupt on new FIFO value
+    mpu_set_dmp_state(1); // Turn on DMP
+    mpu_get_dmp_state(&dmp_state);
+    printf("DMP state: %i\n", dmp_state);
+    //set_int_enable(1); // Enable interrupt
     return 0;
 }
 
@@ -79,3 +107,5 @@ inline int min ( int a, int b ){
 inline void __no_operation(){
     
 }
+
+
