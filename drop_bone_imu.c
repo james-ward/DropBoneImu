@@ -21,9 +21,12 @@ int main(int argc, char **argv){
     unsigned char more[0];
     struct pollfd fdset[1];
     char buf[1];
+    char led[2] = {'0', '\n'};
     
     // File descriptor for the GPIO interrupt pin
     int gpio_fd = open(GPIO_INT_FILE, O_RDONLY | O_NONBLOCK);
+    // File descriptor for user LED
+    int led_fd = open("/sys/class/leds/beaglebone:green:usr1/brightness", O_WRONLY);
     
     // Create an event on the GPIO value file
     memset((void*)fdset, 0, sizeof(fdset));
@@ -37,6 +40,9 @@ int main(int argc, char **argv){
         if (fdset[0].revents & POLLPRI) {
             // Read the file to make it reset the interrupt
             read(fdset[0].fd, buf, 1);
+            // Flip the LED
+            led[0] = led[0] == '0' ? '1' : '0';
+            write(led_fd, &led, 2);
         
             int fifo_read = dmp_read_fifo(gyro, accel, quat, &timestamp, sensors, more);
             if (fifo_read != 0) {
