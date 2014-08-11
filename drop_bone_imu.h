@@ -9,8 +9,8 @@
 #define MPU6050_WHO_AM_I 0x75
 #define DEFAULT_MPU_HZ  100
 #define DEFAULT_FIFO_HZ 10
-#define QUAT_SCALE 1073741824.0
-
+#define QUAT_SCALE 1073741824.0 // 1<<30
+#define GPIO_INT_FILE "/sys/class/gpio/gpio14/value"
 
 #include "inv_mpu_dmp_motion_driver.h"
 #include "inv_mpu.h"

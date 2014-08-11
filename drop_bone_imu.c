@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <math.h>
+#include <poll.h>
 
 static int fd; // file descriptor for the I2C bus
 
@@ -18,25 +19,38 @@ int main(int argc, char **argv){
     long quat[4];
     unsigned long timestamp;
     unsigned char more[0];
+    struct pollfd fdset[1];
+    char buf[1];
+    
+    // File descriptor for the GPIO interrupt pin
+    int gpio_fd = open(GPIO_INT_FILE, O_RDONLY | O_NONBLOCK);
+    
+    // Create an event on the GPIO value file
+    memset((void*)fdset, 0, sizeof(fdset));
+    fdset[0].fd = gpio_fd;
+    fdset[0].events = POLLPRI;
     
     for (;;) {
-        short status;
-        mpu_get_int_status(&status);
-        if (! (status & MPU_INT_STATUS_DMP) )
-            continue;
-        int fifo_read = dmp_read_fifo(gyro, accel, quat, &timestamp, sensors, more);
-        if (fifo_read != 0) {
-            printf("Error reading fifo.\n");
+        // Blocking poll to wait for an edge on the interrupt
+        poll(fdset, 1, -1);
+        
+        if (fdset[0].revents & POLLPRI) {
+            // Read the file to make it reset the interrupt
+            read(fdset[0].fd, buf, 1);
+        
+            int fifo_read = dmp_read_fifo(gyro, accel, quat, &timestamp, sensors, more);
+            if (fifo_read != 0) {
+                printf("Error reading fifo.\n");
+            }
+            if (fifo_read == 0 && sensors[0]) {
+                float angles[3];
+                euler(quat, angles);
+                //printf("Quaternions: %f\t%f\t%f\t%f\n",
+                //    quat[0] / QUAT_SCALE, quat[1] / QUAT_SCALE, quat[2] / QUAT_SCALE, quat[3] / QUAT_SCALE);
+                printf("Yaw: %+5.1f\tRoll: %+5.1f\tPitch: %+5.1f\n",
+                    angles[0]*180.0/3.14159, angles[1]*180.0/3.14159, angles[2]*180.0/3.14159);
+            }
         }
-        if (fifo_read == 0 && sensors[0]) {
-            float angles[3];
-            euler(quat, angles);
-            //printf("Quaternions: %f\t%f\t%f\t%f\n",
-            //    quat[0] / QUAT_SCALE, quat[1] / QUAT_SCALE, quat[2] / QUAT_SCALE, quat[3] / QUAT_SCALE);
-            printf("Yaw: %+5.1f\tRoll: %+5.1f\tPitch: %+5.1f\n",
-                angles[0]*180.0/3.14159, angles[1]*180.0/3.14159, angles[2]*180.0/3.14159);
-        }
-        usleep(20000);
     }
     return 0;
 }
@@ -70,12 +84,11 @@ int init(void) {
         DMP_FEATURE_GYRO_CAL;
     dmp_enable_feature(dmp_features);
     
-    mpu_set_int_level(0); // Interrupt is high when firing
-    //mpu_set_int_latched(1);
-    dmp_set_interrupt_mode(DMP_INT_CONTINUOUS); // Fire interrupt on new FIFO value
     mpu_set_dmp_state(1); // Turn on DMP
     mpu_get_dmp_state(&dmp_state);
     printf("DMP state: %i\n", dmp_state);
+    mpu_set_int_level(1); // Interrupt is low when firing
+    dmp_set_interrupt_mode(DMP_INT_CONTINUOUS); // Fire interrupt on new FIFO value
     return 0;
 }
 
